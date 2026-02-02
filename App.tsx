@@ -12,7 +12,7 @@ const App: React.FC = () => {
     time: 800,
     day: 1,
     weather: 'sunny',
-    events: ['Madfroggys are populating the vast new swamp.'],
+    events: ['The Grand Swamp Square is bustling with activity.'],
   });
   const [eventLog, setEventLog] = useState<SimEvent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -22,7 +22,6 @@ const App: React.FC = () => {
 
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
-  // Simulation Time - 1 real second = 1 sim minute (Balanced)
   useEffect(() => {
     const timer = setInterval(() => {
       setWorldState(prev => {
@@ -39,20 +38,19 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Task Scheduler - Keeps all 15+ agents busy
   useEffect(() => {
     const taskInterval = setInterval(async () => {
-      const busyAgents = agents.filter(a => a.target !== null).length;
-      if (busyAgents < 8 && !isProcessing) {
-        // Pick an idle agent
-        const idleAgents = agents.filter(a => !a.target);
-        const agentToTask = idleAgents[Math.floor(Math.random() * idleAgents.length)];
-        if (agentToTask) {
-          const randomDest = buildings[Math.floor(Math.random() * buildings.length)];
-          const reaction = await generateAgentReaction(agentToTask, worldState, buildings, `Routine task: Go to ${randomDest.name}`);
+      const activeCount = agents.filter(a => a.target !== null).length;
+      if (activeCount < 10 && !isProcessing) {
+        const idle = agents.filter(a => !a.target);
+        const aToTask = idle[Math.floor(Math.random() * idle.length)];
+        if (aToTask) {
+          const dests = buildings.filter(b => b.type !== 'house' || b.id === aToTask.houseId);
+          const randomDest = dests[Math.floor(Math.random() * dests.length)];
+          const reaction = await generateAgentReaction(aToTask, worldState, buildings, `Task: Head to ${randomDest.name}`);
           
           if (reaction) {
-            setAgents(prev => prev.map(a => a.id === agentToTask.id ? {
+            setAgents(prev => prev.map(a => a.id === aToTask.id ? {
               ...a,
               emotionalState: reaction.emotionalState,
               currentThought: reaction.currentThought,
@@ -65,7 +63,7 @@ const App: React.FC = () => {
           }
         }
       }
-    }, 4000);
+    }, 5000);
     return () => clearInterval(taskInterval);
   }, [agents, buildings, worldState, isProcessing]);
 
@@ -86,54 +84,55 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a] text-[#f0f0f0] font-mono overflow-hidden">
+    <div className="flex h-screen bg-[#050505] text-[#e0e0e0] font-mono overflow-hidden">
       
-      {/* Left Sidebar: Character List */}
-      <div className="w-[280px] bg-[#121212] border-r border-gray-800 flex flex-col overflow-hidden shadow-2xl z-20">
-        <div className="p-4 border-b border-gray-800">
-           <h2 className="text-[10px] font-black text-yellow-500 uppercase tracking-widest mb-2">Population Index</h2>
-           <div className="text-[8px] text-gray-500 italic">{agents.length} Active Villagers</div>
+      {/* Village Roster */}
+      <div className="w-[300px] bg-[#0c0c0c] border-r border-white/10 flex flex-col overflow-hidden shadow-2xl z-20">
+        <div className="p-6 border-b border-white/10 bg-black/40">
+           <h2 className="text-[12px] font-black text-yellow-500 uppercase tracking-tighter mb-1">Villager Roster</h2>
+           <div className="text-[9px] text-gray-500 tracking-widest">{agents.length} HUMAN-LIKE FROGGIES</div>
         </div>
-        <div className="flex-1 overflow-y-auto no-scrollbar p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-2">
           {agents.map(a => (
             <button
               key={a.id}
               onClick={() => setSelectedAgentId(a.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-md transition-all ${selectedAgentId === a.id ? 'bg-yellow-900/30 border-l-4 border-yellow-500' : 'hover:bg-white/5 border-l-4 border-transparent'}`}
+              className={`w-full flex items-center gap-4 p-4 rounded-lg transition-all border-2 ${selectedAgentId === a.id ? 'bg-yellow-500/10 border-yellow-500/50 shadow-[0_0_15px_rgba(255,215,0,0.1)]' : 'bg-white/5 border-transparent hover:border-white/20'}`}
             >
-              <span className="text-xl">{a.emotionalState}</span>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-inner border border-white/10" style={{backgroundColor: a.color}}>
+                {a.emotionalState}
+              </div>
               <div className="text-left">
-                <div className="text-[9px] font-bold uppercase">{a.name}</div>
-                <div className="text-[7px] text-gray-500 truncate w-32">{a.destinationName}</div>
+                <div className="text-[10px] font-black uppercase text-white tracking-tighter">{a.name}</div>
+                <div className="text-[8px] text-gray-500 font-bold uppercase tracking-widest truncate w-32">{a.destinationName}</div>
               </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Main Simulation Area */}
       <div className="flex-1 flex flex-col relative">
-        
-        {/* Top Dashboard */}
-        <div className="h-20 bg-[#161616] border-b border-gray-800 flex items-center justify-between px-8 z-10 shadow-lg">
+        <div className="h-24 bg-[#0f0f0f] border-b border-white/10 flex items-center justify-between px-10 z-10">
            <div>
-             <h1 className="text-xl font-black text-yellow-500 tracking-tighter">MADFROGGY MEGA SWAMP</h1>
-             <p className="text-[8px] text-gray-500 uppercase tracking-widest">Village Core Simulation v3.0</p>
+             <h1 className="text-2xl font-black text-yellow-500 tracking-tighter shadow-yellow-900">MADFROGGY METROPOLIS</h1>
+             <p className="text-[9px] text-gray-600 uppercase tracking-[0.3em] font-black">AI Swarm Engine v4.0</p>
            </div>
-           <div className="flex items-center gap-6">
-              <div className="bg-black border border-gray-800 rounded-md px-4 py-2 flex flex-col items-center">
-                 <span className="text-green-500 text-sm font-bold">{formatTime(worldState.time)}</span>
-                 <span className="text-[7px] text-gray-600 uppercase font-black">Local Time</span>
+           <div className="flex items-center gap-8">
+              <div className="flex flex-col items-center gap-1">
+                 <div className="text-green-500 text-lg font-black tracking-widest bg-black px-5 py-2 rounded-lg border border-white/5">{formatTime(worldState.time)}</div>
+                 <span className="text-[8px] text-gray-700 font-black uppercase">Clock Synced</span>
               </div>
-              <div className="bg-blue-900/10 border border-blue-900/30 rounded-md px-4 py-2 flex items-center gap-2">
-                 <span className="text-xl">{worldState.weather === 'sunny' ? '☀️' : (worldState.weather === 'rainy' ? '🌧️' : '⛈️')}</span>
-                 <span className="text-[8px] text-blue-400 font-black uppercase">{worldState.weather}</span>
+              <div className="flex items-center gap-4 bg-blue-500/5 px-6 py-3 rounded-lg border border-blue-500/20">
+                 <span className="text-3xl drop-shadow-lg">{worldState.weather === 'sunny' ? '☀️' : '🌧️'}</span>
+                 <div className="flex flex-col">
+                   <span className="text-[10px] text-blue-400 font-black uppercase tracking-tighter">{worldState.weather}</span>
+                   <span className="text-[7px] text-blue-900 uppercase font-black">Atmosphere</span>
+                 </div>
               </div>
            </div>
         </div>
 
-        {/* Engine Viewport */}
-        <div className="flex-1 relative overflow-hidden bg-black">
+        <div className="flex-1 relative overflow-hidden">
            <GameEngine 
              agents={agents} 
              buildings={buildings} 
@@ -144,83 +143,98 @@ const App: React.FC = () => {
              focusedAgentId={selectedAgentId}
            />
 
-           {/* In-world overlays */}
            {hoveredAgent && (
-             <div className="absolute top-6 right-6 p-4 bg-black/80 border border-yellow-500/30 backdrop-blur-md z-30 pointer-events-none rounded shadow-2xl animate-in slide-in-from-top-2">
-                <div className="flex items-center gap-3 mb-2">
-                   <span className="text-2xl">{hoveredAgent.emotionalState}</span>
-                   <span className="text-[10px] font-black uppercase text-yellow-500">{hoveredAgent.name}</span>
+             <div className="absolute top-8 left-8 p-6 bg-black/90 border-2 border-yellow-500/40 backdrop-blur-lg z-30 pointer-events-none rounded-2xl shadow-2xl animate-in fade-in zoom-in duration-300">
+                <div className="flex items-center gap-4 mb-4">
+                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-4xl bg-white/5 border border-white/10 shadow-lg">{hoveredAgent.emotionalState}</div>
+                   <div>
+                     <span className="text-[14px] font-black uppercase text-yellow-500 block leading-none">{hoveredAgent.name}</span>
+                     <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Village Resident</span>
+                   </div>
                 </div>
-                <p className="text-[9px] italic text-blue-200">"{hoveredAgent.currentThought}"</p>
+                <div className="space-y-3">
+                   <div className="text-[10px] italic text-blue-100 bg-blue-500/10 p-3 rounded-lg border border-blue-500/20 leading-relaxed">"{hoveredAgent.currentThought}"</div>
+                   <div className="flex justify-between items-center text-[8px] font-bold text-gray-400 uppercase">
+                      <span>Destination</span>
+                      <span className="text-green-500">{hoveredAgent.destinationName}</span>
+                   </div>
+                </div>
              </div>
            )}
 
            {isProcessing && (
-             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-                <div className="bg-black border-2 border-red-500 p-8 shadow-[0_0_40px_rgba(255,0,0,0.4)]">
-                   <p className="text-[10px] font-black text-red-500 animate-pulse tracking-[0.5em] uppercase">Recalibrating Swamp Reality...</p>
+             <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50">
+                <div className="bg-black border-4 border-red-500/50 p-12 shadow-[0_0_80px_rgba(255,0,0,0.2)] rounded-3xl text-center">
+                   <div className="w-20 h-20 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
+                   <p className="text-[12px] font-black text-red-500 animate-pulse tracking-[0.6em] uppercase">Constructing Reality Matrices</p>
                 </div>
              </div>
            )}
         </div>
       </div>
 
-      {/* Right Intelligence Panel */}
-      <div className="w-[320px] bg-[#121212] border-l border-gray-800 p-4 flex flex-col gap-4 z-20">
+      <div className="w-[340px] bg-[#0c0c0c] border-l border-white/10 p-6 flex flex-col gap-6 z-20">
          {selectedAgent ? (
-           <div className="flex flex-col h-full">
-              <h2 className="text-[10px] font-black text-blue-400 uppercase border-b border-gray-800 pb-2 mb-4">Neural Scan</h2>
-              <div className="flex-1 space-y-6 overflow-y-auto no-scrollbar">
-                 <div className="bg-blue-900/5 p-4 border border-blue-900/20 rounded">
-                    <h3 className="text-[8px] text-blue-500 mb-2 font-bold uppercase tracking-widest underline">Thought Process</h3>
-                    <p className="text-[10px] text-blue-100 leading-relaxed italic">"{selectedAgent.currentThought}"</p>
-                    <p className="text-[7px] text-gray-500 mt-2">REASON: {selectedAgent.reasoning}</p>
+           <div className="flex flex-col h-full animate-in slide-in-from-right-10 duration-500">
+              <h2 className="text-[12px] font-black text-blue-400 uppercase border-b-2 border-blue-500/30 pb-3 mb-6">Cognitive Interface</h2>
+              <div className="flex-1 space-y-8 overflow-y-auto no-scrollbar pr-2">
+                 <div className="bg-blue-500/5 p-5 border-2 border-blue-500/20 rounded-2xl shadow-inner">
+                    <h3 className="text-[9px] text-blue-500 mb-3 font-black uppercase tracking-widest">Stream of Consciousness</h3>
+                    <p className="text-[11px] text-blue-100 leading-relaxed italic font-medium">"{selectedAgent.currentThought}"</p>
+                    <div className="mt-4 pt-4 border-t border-white/5">
+                       <p className="text-[8px] text-gray-500 uppercase mb-1">Logical Rationale</p>
+                       <p className="text-[9px] text-gray-400 leading-tight">{selectedAgent.reasoning}</p>
+                    </div>
                  </div>
-                 <div className="bg-white/5 p-4 rounded border border-gray-800">
-                    <h3 className="text-[8px] text-gray-400 mb-2 font-bold uppercase tracking-widest">Cognitive Matrix</h3>
-                    <div className="space-y-3">
+                 <div className="bg-white/5 p-6 rounded-2xl border border-white/10 shadow-lg">
+                    <h3 className="text-[9px] text-gray-400 mb-4 font-black uppercase tracking-widest">Attribute Matrix</h3>
+                    <div className="space-y-4">
                        {Object.entries(selectedAgent.skills).map(([s, v]) => (
                          <div key={s}>
-                           <div className="flex justify-between text-[7px] mb-1">
-                              <span className="uppercase">{s}</span>
-                              <span>{v}/10</span>
+                           <div className="flex justify-between text-[8px] mb-2 font-black uppercase">
+                              <span className="text-gray-500">{s}</span>
+                              <span className="text-blue-400">{v}/10</span>
                            </div>
-                           {/* Fix: Casting 'v' to any/number to satisfy TypeScript arithmetic requirements on the left-hand side */}
-                           <div className="h-1 bg-black rounded overflow-hidden"><div className="h-full bg-blue-600" style={{width: `${(v as any) * 10}%`}}></div></div>
+                           <div className="h-2 bg-black rounded-full overflow-hidden border border-white/5">
+                             <div className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{width: `${(v as any) * 10}%`}}></div>
+                           </div>
                          </div>
                        ))}
                     </div>
                  </div>
-                 <div className="space-y-2">
-                    <h3 className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">Active Objectives</h3>
-                    <div className="text-[9px] bg-black p-3 rounded border border-green-900/30 text-green-400">
-                       PROCEEDING TO: {selectedAgent.destinationName}
+                 <div className="space-y-3">
+                    <h3 className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Active Waypoint</h3>
+                    <div className="text-[11px] bg-green-500/10 p-4 rounded-xl border-2 border-green-500/20 text-green-400 font-bold uppercase shadow-inner">
+                       {selectedAgent.destinationName}
                     </div>
                  </div>
               </div>
-              <div className="mt-auto pt-4 border-t border-gray-800">
-                 <button onClick={() => setSelectedAgentId(null)} className="w-full bg-red-900/20 border border-red-900/40 text-red-500 text-[9px] py-2 uppercase font-black hover:bg-red-900/40 transition-colors">Release Focus</button>
+              <div className="mt-auto pt-6 border-t border-white/10">
+                 <button onClick={() => setSelectedAgentId(null)} className="w-full bg-red-500/10 border-2 border-red-500/30 text-red-500 text-[10px] py-4 uppercase font-black rounded-xl hover:bg-red-500/20 transition-all shadow-lg active:scale-95">Disengage Focus</button>
               </div>
            </div>
          ) : (
-           <div className="flex flex-col h-full">
-              <h2 className="text-[10px] font-black text-red-500 uppercase border-b border-gray-800 pb-2 mb-4">World Engine</h2>
-              <div className="flex-1 bg-black/40 p-3 rounded overflow-y-auto no-scrollbar space-y-3 border border-gray-800/50">
-                 <div className="text-[8px] text-gray-600 font-black flex items-center gap-2"><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div> SYSTEM FEED</div>
-                 {eventLog.slice(0, 10).map((l, i) => (
-                   <div key={i} className="text-[9px] border-l-2 border-red-900 pl-2 py-1 leading-tight text-gray-400">
-                      {l.description}
-                   </div>
-                 ))}
+           <div className="flex flex-col h-full animate-in fade-in duration-700">
+              <h2 className="text-[12px] font-black text-red-500 uppercase border-b-2 border-red-500/30 pb-3 mb-6">Simulation Hub</h2>
+              <div className="flex-1 bg-black/60 p-5 rounded-2xl overflow-y-auto no-scrollbar space-y-4 border-2 border-white/5 shadow-inner">
+                 <div className="text-[9px] text-green-500 font-black flex items-center gap-3"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div> LIVE FEED ACTIVE</div>
+                 <div className="space-y-3">
+                   {eventLog.slice(0, 15).map((l, i) => (
+                     <div key={i} className="text-[10px] border-l-2 border-white/20 pl-4 py-2 leading-relaxed text-gray-400 bg-white/5 rounded-r-lg">
+                        {l.description}
+                     </div>
+                   ))}
+                 </div>
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-800">
-                 <h3 className="text-[8px] text-gray-500 mb-2 font-bold uppercase">Manual Override</h3>
+              <div className="mt-8 pt-8 border-t border-white/10">
+                 <h3 className="text-[9px] text-gray-600 mb-3 font-black uppercase tracking-widest">Divine Command Input</h3>
                  <input 
                    type="text" value={parentInput} onChange={(e) => setParentInput(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && (triggerGlobalEvent(parentInput), setParentInput(''))}
-                   placeholder="Command reality..."
-                   className="w-full bg-black border border-gray-800 p-3 text-[10px] rounded focus:border-red-500 transition-all outline-none"
+                   placeholder="Alter the environment..."
+                   className="w-full bg-black border-2 border-white/10 p-4 text-[11px] rounded-xl focus:border-yellow-500/50 transition-all outline-none font-bold text-yellow-500 shadow-lg"
                  />
+                 <p className="text-[7px] text-gray-700 mt-3 text-center uppercase font-black">Reality warping protocols standing by</p>
               </div>
            </div>
          )}

@@ -9,9 +9,9 @@ export enum Emotion {
   SURPRISED = '😲'
 }
 
-export type AnimationState = 'idle' | 'walking' | 'working' | 'scanning' | 'breathing' | 'checking_watch';
+export type AnimationState = 'idle' | 'walking' | 'working' | 'scanning' | 'breathing' | 'checking_watch' | 'gesturing';
 export type Point = { x: number; y: number };
-export type TreeType = 'pine' | 'banyan' | 'willow' | 'sakura' | 'coconut' | 'mango' | 'jackfruit' | 'bush' | 'grass';
+export type TreeType = 'pine' | 'banyan' | 'willow' | 'sakura' | 'coconut' | 'mango' | 'jackfruit' | 'bush' | 'grass' | 'flower_red' | 'flower_blue' | 'flower_yellow';
 
 export interface Agent {
   id: string;
@@ -29,12 +29,11 @@ export interface Agent {
   memories: string[];
   color: string;
   houseId: number;
-  // Unique Madfroggy Traits
   traits: {
     eyeType: 'slit' | 'dot' | 'lightning' | 'laser';
     mouthType: 'smile' | 'mask' | 'cigar' | 'tentacles' | 'teeth';
-    accessory: 'shades' | 'chain' | 'halo' | 'none';
-    shirtStyle: 'plain' | 'striped' | 'logo' | 'jersey';
+    accessory: 'shades' | 'chain' | 'halo' | 'none' | 'hat';
+    shirtStyle: 'plain' | 'striped' | 'logo' | 'jersey' | 'suit';
     shirtText?: string;
   };
 }
@@ -42,15 +41,15 @@ export interface Agent {
 export interface Building {
   id: number;
   name: string;
-  type: 'house' | 'shop' | 'park' | 'office' | 'square' | 'water';
+  type: 'house' | 'shop' | 'park' | 'office' | 'square' | 'water' | 'fountain';
   position: Point;
   size: { w: number; h: number };
   state: 'normal' | 'burning' | 'festive' | 'damaged';
-  ownerId?: string;
+  ownerName?: string;
 }
 
 export interface WorldState {
-  time: number; // 0 to 2400
+  time: number;
   day: number;
   weather: 'sunny' | 'rainy' | 'stormy' | 'snowy';
   events: string[];
