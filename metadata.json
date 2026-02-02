@@ -1,0 +1,8 @@
+{
+  "name": "Madfroggys Town v2.5",
+  "description": "A living 2D pixel-art simulation of the Madfroggy universe, featuring high-fidelity animations, organic environment logic, and AI-driven storytelling.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
