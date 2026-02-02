@@ -12,12 +12,13 @@ const App: React.FC = () => {
     time: 800,
     day: 1,
     weather: 'sunny',
-    events: ['The Grand Swamp Square is bustling with activity.'],
+    events: ['The town is bustling in a single frame today.'],
   });
   const [eventLog, setEventLog] = useState<SimEvent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [hoveredAgent, setHoveredAgent] = useState<Agent | null>(null);
   const [parentInput, setParentInput] = useState('');
+  const [agentChatInput, setAgentChatInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
@@ -38,16 +39,17 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Autonomous routine tasks for agents
   useEffect(() => {
     const taskInterval = setInterval(async () => {
       const activeCount = agents.filter(a => a.target !== null).length;
-      if (activeCount < 10 && !isProcessing) {
+      if (activeCount < 8 && !isProcessing) {
         const idle = agents.filter(a => !a.target);
         const aToTask = idle[Math.floor(Math.random() * idle.length)];
         if (aToTask) {
           const dests = buildings.filter(b => b.type !== 'house' || b.id === aToTask.houseId);
           const randomDest = dests[Math.floor(Math.random() * dests.length)];
-          const reaction = await generateAgentReaction(aToTask, worldState, buildings, `Task: Head to ${randomDest.name}`);
+          const reaction = await generateAgentReaction(aToTask, worldState, buildings, `Task: Visit ${randomDest.name}`);
           
           if (reaction) {
             setAgents(prev => prev.map(a => a.id === aToTask.id ? {
@@ -55,7 +57,10 @@ const App: React.FC = () => {
               emotionalState: reaction.emotionalState,
               currentThought: reaction.currentThought,
               destinationName: reaction.destination,
-              target: {
+              target: buildings.find(b => b.name === reaction.destination)?.position ? {
+                x: buildings.find(b => b.name === reaction.destination)!.position.x + buildings.find(b => b.name === reaction.destination)!.size.w / 2,
+                y: buildings.find(b => b.name === reaction.destination)!.position.y + buildings.find(b => b.name === reaction.destination)!.size.h / 2
+              } : {
                 x: randomDest.position.x + randomDest.size.w / 2,
                 y: randomDest.position.y + randomDest.size.h / 2
               }
@@ -63,16 +68,58 @@ const App: React.FC = () => {
           }
         }
       }
-    }, 5000);
+    }, 12000);
     return () => clearInterval(taskInterval);
   }, [agents, buildings, worldState, isProcessing]);
 
+  // Broadcast global event to all agents
   const triggerGlobalEvent = async (description: string) => {
+    if (!description.trim()) return;
     setIsProcessing(true);
     const envUpdate = await generateEnvironmentChange(worldState, description);
     if (envUpdate) {
       setWorldState(prev => ({ ...prev, weather: envUpdate.weather, events: [envUpdate.eventLog, ...prev.events].slice(0, 5) }));
       setEventLog(prev => [{ type: 'ENVIRONMENT_CHANGE', description: envUpdate.eventLog, timestamp: Date.now() }, ...prev]);
+      
+      const updatedAgents = await Promise.all(agents.map(async (agent) => {
+        const reaction = await generateAgentReaction(agent, worldState, buildings, `Global Event: ${envUpdate.eventLog}`);
+        if (reaction) {
+          return {
+            ...agent,
+            emotionalState: reaction.emotionalState,
+            currentThought: reaction.currentThought,
+            destinationName: reaction.destination,
+            target: buildings.find(b => b.name === reaction.destination)?.position ? {
+                x: buildings.find(b => b.name === reaction.destination)!.position.x + buildings.find(b => b.name === reaction.destination)!.size.w / 2,
+                y: buildings.find(b => b.name === reaction.destination)!.position.y + buildings.find(b => b.name === reaction.destination)!.size.h / 2
+              } : agent.target
+          };
+        }
+        return agent;
+      }));
+      setAgents(updatedAgents);
+    }
+    setIsProcessing(false);
+  };
+
+  const chatWithAgent = async (agentId: string, message: string) => {
+    if (!message.trim()) return;
+    setIsProcessing(true);
+    const agent = agents.find(a => a.id === agentId);
+    if (!agent) return;
+    const reaction = await generateAgentReaction(agent, worldState, buildings, message);
+    if (reaction) {
+      setAgents(prev => prev.map(a => a.id === agentId ? {
+        ...a,
+        emotionalState: reaction.emotionalState,
+        currentThought: reaction.currentThought,
+        destinationName: reaction.destination,
+        target: buildings.find(b => b.name === reaction.destination)?.position ? {
+            x: buildings.find(b => b.name === reaction.destination)!.position.x + buildings.find(b => b.name === reaction.destination)!.size.w / 2,
+            y: buildings.find(b => b.name === reaction.destination)!.position.y + buildings.find(b => b.name === reaction.destination)!.size.h / 2
+          } : a.target
+      } : a));
+      setEventLog(prev => [{ type: 'AGENT_TASK', description: `Instructed ${agent.name}: ${message}`, timestamp: Date.now() }, ...prev]);
     }
     setIsProcessing(false);
   };
@@ -86,25 +133,25 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-[#050505] text-[#e0e0e0] font-mono overflow-hidden">
       
-      {/* Village Roster */}
-      <div className="w-[300px] bg-[#0c0c0c] border-r border-white/10 flex flex-col overflow-hidden shadow-2xl z-20">
+      {/* Village Roster Sidebar */}
+      <div className="w-[280px] bg-[#0c0c0c] border-r border-white/10 flex flex-col overflow-hidden shadow-2xl z-20">
         <div className="p-6 border-b border-white/10 bg-black/40">
-           <h2 className="text-[12px] font-black text-yellow-500 uppercase tracking-tighter mb-1">Villager Roster</h2>
-           <div className="text-[9px] text-gray-500 tracking-widest">{agents.length} HUMAN-LIKE FROGGIES</div>
+           <h2 className="text-[12px] font-black text-yellow-500 uppercase tracking-tighter mb-1">Population</h2>
+           <div className="text-[9px] text-gray-500 tracking-widest">{agents.length} AGENTS ONLINE</div>
         </div>
         <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-2">
           {agents.map(a => (
             <button
               key={a.id}
               onClick={() => setSelectedAgentId(a.id)}
-              className={`w-full flex items-center gap-4 p-4 rounded-lg transition-all border-2 ${selectedAgentId === a.id ? 'bg-yellow-500/10 border-yellow-500/50 shadow-[0_0_15px_rgba(255,215,0,0.1)]' : 'bg-white/5 border-transparent hover:border-white/20'}`}
+              className={`w-full flex items-center gap-3 p-4 rounded-xl transition-all border-2 ${selectedAgentId === a.id ? 'bg-yellow-500/10 border-yellow-500/50 shadow-lg' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
             >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-inner border border-white/10" style={{backgroundColor: a.color}}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-lg border border-white/10" style={{backgroundColor: a.color}}>
                 {a.emotionalState}
               </div>
               <div className="text-left">
                 <div className="text-[10px] font-black uppercase text-white tracking-tighter">{a.name}</div>
-                <div className="text-[8px] text-gray-500 font-bold uppercase tracking-widest truncate w-32">{a.destinationName}</div>
+                <div className="text-[8px] text-gray-500 truncate w-32">{a.destinationName}</div>
               </div>
             </button>
           ))}
@@ -112,27 +159,28 @@ const App: React.FC = () => {
       </div>
 
       <div className="flex-1 flex flex-col relative">
+        {/* Top Header */}
         <div className="h-24 bg-[#0f0f0f] border-b border-white/10 flex items-center justify-between px-10 z-10">
            <div>
-             <h1 className="text-2xl font-black text-yellow-500 tracking-tighter shadow-yellow-900">MADFROGGY METROPOLIS</h1>
-             <p className="text-[9px] text-gray-600 uppercase tracking-[0.3em] font-black">AI Swarm Engine v4.0</p>
+             <h1 className="text-2xl font-black text-yellow-500 tracking-tighter">FROGGY TOWN STATIC</h1>
+             <p className="text-[9px] text-gray-600 uppercase tracking-[0.3em] font-black">Entire Town Simulation Frame</p>
            </div>
            <div className="flex items-center gap-8">
-              <div className="flex flex-col items-center gap-1">
-                 <div className="text-green-500 text-lg font-black tracking-widest bg-black px-5 py-2 rounded-lg border border-white/5">{formatTime(worldState.time)}</div>
-                 <span className="text-[8px] text-gray-700 font-black uppercase">Clock Synced</span>
+              <div className="flex flex-col items-center">
+                 <div className="text-green-500 text-lg font-black tracking-widest bg-black px-6 py-2 rounded-lg border border-white/5">{formatTime(worldState.time)}</div>
+                 <span className="text-[8px] text-gray-700 font-black uppercase mt-1">Clock</span>
               </div>
-              <div className="flex items-center gap-4 bg-blue-500/5 px-6 py-3 rounded-lg border border-blue-500/20">
-                 <span className="text-3xl drop-shadow-lg">{worldState.weather === 'sunny' ? '☀️' : '🌧️'}</span>
+              <div className="flex items-center gap-4 bg-blue-500/5 px-6 py-3 rounded-xl border border-blue-500/20">
+                 <span className="text-3xl">{worldState.weather === 'sunny' ? '☀️' : '🌧️'}</span>
                  <div className="flex flex-col">
-                   <span className="text-[10px] text-blue-400 font-black uppercase tracking-tighter">{worldState.weather}</span>
-                   <span className="text-[7px] text-blue-900 uppercase font-black">Atmosphere</span>
+                   <span className="text-[10px] text-blue-400 font-black uppercase">{worldState.weather}</span>
                  </div>
               </div>
            </div>
         </div>
 
-        <div className="flex-1 relative overflow-hidden">
+        {/* Viewport */}
+        <div className="flex-1 relative overflow-hidden bg-black flex items-center justify-center">
            <GameEngine 
              agents={agents} 
              buildings={buildings} 
@@ -144,100 +192,89 @@ const App: React.FC = () => {
            />
 
            {hoveredAgent && (
-             <div className="absolute top-8 left-8 p-6 bg-black/90 border-2 border-yellow-500/40 backdrop-blur-lg z-30 pointer-events-none rounded-2xl shadow-2xl animate-in fade-in zoom-in duration-300">
-                <div className="flex items-center gap-4 mb-4">
-                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-4xl bg-white/5 border border-white/10 shadow-lg">{hoveredAgent.emotionalState}</div>
+             <div className="absolute top-8 left-8 p-6 bg-black/95 border-2 border-yellow-500/50 backdrop-blur-xl z-30 pointer-events-none rounded-2xl shadow-2xl max-w-sm animate-in fade-in zoom-in">
+                <div className="flex items-center gap-5 mb-4">
+                   <div className="w-12 h-12 rounded-xl flex items-center justify-center text-3xl bg-white/5 border border-white/10">{hoveredAgent.emotionalState}</div>
                    <div>
-                     <span className="text-[14px] font-black uppercase text-yellow-500 block leading-none">{hoveredAgent.name}</span>
-                     <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest">Village Resident</span>
+                     <span className="text-[16px] font-black uppercase text-yellow-500 block">{hoveredAgent.name}</span>
+                     <span className="text-[9px] text-gray-500 uppercase">Thought Log</span>
                    </div>
                 </div>
-                <div className="space-y-3">
-                   <div className="text-[10px] italic text-blue-100 bg-blue-500/10 p-3 rounded-lg border border-blue-500/20 leading-relaxed">"{hoveredAgent.currentThought}"</div>
-                   <div className="flex justify-between items-center text-[8px] font-bold text-gray-400 uppercase">
-                      <span>Destination</span>
-                      <span className="text-green-500">{hoveredAgent.destinationName}</span>
-                   </div>
+                <div className="text-[11px] italic text-blue-100 bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 leading-relaxed">
+                   "{hoveredAgent.currentThought}"
                 </div>
              </div>
            )}
 
            {isProcessing && (
-             <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50">
-                <div className="bg-black border-4 border-red-500/50 p-12 shadow-[0_0_80px_rgba(255,0,0,0.2)] rounded-3xl text-center">
-                   <div className="w-20 h-20 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                   <p className="text-[12px] font-black text-red-500 animate-pulse tracking-[0.6em] uppercase">Constructing Reality Matrices</p>
+             <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 text-center">
+                <div>
+                   <div className="w-16 h-16 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin mx-auto mb-4"></div>
+                   <p className="text-[12px] font-black text-yellow-500 animate-pulse uppercase">Syncing Reality...</p>
                 </div>
              </div>
            )}
         </div>
       </div>
 
-      <div className="w-[340px] bg-[#0c0c0c] border-l border-white/10 p-6 flex flex-col gap-6 z-20">
-         {selectedAgent ? (
-           <div className="flex flex-col h-full animate-in slide-in-from-right-10 duration-500">
-              <h2 className="text-[12px] font-black text-blue-400 uppercase border-b-2 border-blue-500/30 pb-3 mb-6">Cognitive Interface</h2>
-              <div className="flex-1 space-y-8 overflow-y-auto no-scrollbar pr-2">
-                 <div className="bg-blue-500/5 p-5 border-2 border-blue-500/20 rounded-2xl shadow-inner">
-                    <h3 className="text-[9px] text-blue-500 mb-3 font-black uppercase tracking-widest">Stream of Consciousness</h3>
-                    <p className="text-[11px] text-blue-100 leading-relaxed italic font-medium">"{selectedAgent.currentThought}"</p>
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                       <p className="text-[8px] text-gray-500 uppercase mb-1">Logical Rationale</p>
-                       <p className="text-[9px] text-gray-400 leading-tight">{selectedAgent.reasoning}</p>
-                    </div>
-                 </div>
-                 <div className="bg-white/5 p-6 rounded-2xl border border-white/10 shadow-lg">
-                    <h3 className="text-[9px] text-gray-400 mb-4 font-black uppercase tracking-widest">Attribute Matrix</h3>
-                    <div className="space-y-4">
-                       {Object.entries(selectedAgent.skills).map(([s, v]) => (
-                         <div key={s}>
-                           <div className="flex justify-between text-[8px] mb-2 font-black uppercase">
-                              <span className="text-gray-500">{s}</span>
-                              <span className="text-blue-400">{v}/10</span>
-                           </div>
-                           <div className="h-2 bg-black rounded-full overflow-hidden border border-white/5">
-                             <div className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{width: `${(v as any) * 10}%`}}></div>
-                           </div>
-                         </div>
-                       ))}
-                    </div>
-                 </div>
-                 <div className="space-y-3">
-                    <h3 className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Active Waypoint</h3>
-                    <div className="text-[11px] bg-green-500/10 p-4 rounded-xl border-2 border-green-500/20 text-green-400 font-bold uppercase shadow-inner">
-                       {selectedAgent.destinationName}
-                    </div>
-                 </div>
-              </div>
-              <div className="mt-auto pt-6 border-t border-white/10">
-                 <button onClick={() => setSelectedAgentId(null)} className="w-full bg-red-500/10 border-2 border-red-500/30 text-red-500 text-[10px] py-4 uppercase font-black rounded-xl hover:bg-red-500/20 transition-all shadow-lg active:scale-95">Disengage Focus</button>
-              </div>
-           </div>
-         ) : (
-           <div className="flex flex-col h-full animate-in fade-in duration-700">
-              <h2 className="text-[12px] font-black text-red-500 uppercase border-b-2 border-red-500/30 pb-3 mb-6">Simulation Hub</h2>
-              <div className="flex-1 bg-black/60 p-5 rounded-2xl overflow-y-auto no-scrollbar space-y-4 border-2 border-white/5 shadow-inner">
-                 <div className="text-[9px] text-green-500 font-black flex items-center gap-3"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div> LIVE FEED ACTIVE</div>
-                 <div className="space-y-3">
-                   {eventLog.slice(0, 15).map((l, i) => (
-                     <div key={i} className="text-[10px] border-l-2 border-white/20 pl-4 py-2 leading-relaxed text-gray-400 bg-white/5 rounded-r-lg">
-                        {l.description}
-                     </div>
-                   ))}
-                 </div>
-              </div>
-              <div className="mt-8 pt-8 border-t border-white/10">
-                 <h3 className="text-[9px] text-gray-600 mb-3 font-black uppercase tracking-widest">Divine Command Input</h3>
+      {/* Control Interface Panel */}
+      <div className="w-[360px] bg-[#0c0c0c] border-l border-white/10 flex flex-col z-20 overflow-hidden shadow-2xl">
+         
+         {/* Agent Instruction Chat (Toggleable) */}
+         <div className={`flex flex-col transition-all duration-500 border-b border-white/10 ${selectedAgent ? 'h-[50%]' : 'h-0 overflow-hidden'}`}>
+           {selectedAgent && (
+             <div className="p-6 h-full flex flex-col space-y-4">
+                <div className="flex justify-between items-center border-b border-blue-500/30 pb-3">
+                  <h2 className="text-[12px] font-black text-blue-400 uppercase">Task: {selectedAgent.name}</h2>
+                  <button onClick={() => setSelectedAgentId(null)} className="text-[10px] text-gray-600 hover:text-white uppercase font-black">Dismiss</button>
+                </div>
+                <div className="flex-1 overflow-y-auto no-scrollbar space-y-4">
+                  <div className="bg-blue-500/5 p-4 border border-blue-500/20 rounded-xl">
+                    <p className="text-[11px] text-blue-100 leading-relaxed italic">"{selectedAgent.currentThought}"</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] text-gray-400 font-black uppercase">Speak to Agent</h3>
+                    <textarea 
+                      value={agentChatInput} onChange={(e) => setAgentChatInput(e.target.value)}
+                      placeholder="Instruct the agent..."
+                      className="w-full bg-black border-2 border-blue-500/30 p-3 text-[11px] rounded-xl outline-none focus:border-blue-500 text-blue-100 font-bold h-24 resize-none"
+                    />
+                    <button onClick={() => {chatWithAgent(selectedAgent.id, agentChatInput); setAgentChatInput('');}} className="w-full bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-xl text-[10px] font-black uppercase shadow-lg transition-all active:scale-95">Update Agent</button>
+                  </div>
+                </div>
+             </div>
+           )}
+         </div>
+
+         {/* Permanent Reality Control Panel */}
+         <div className="flex-1 flex flex-col p-6 bg-black/20">
+            <h2 className="text-[12px] font-black text-red-500 uppercase border-b border-red-500/30 pb-3 mb-4">Reality Command</h2>
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 mb-6 bg-black/40 p-4 rounded-xl border border-white/5">
+               <div className="text-[9px] text-green-500 font-black flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> LOGS
+               </div>
+               <div className="space-y-2">
+                 {eventLog.slice(0, 15).map((l, i) => (
+                   <div key={i} className="text-[10px] border-l-2 border-white/10 pl-3 py-1 text-gray-400 leading-tight bg-white/5 rounded-r">
+                      {l.description}
+                   </div>
+                 ))}
+               </div>
+            </div>
+
+            <div className="pt-4 border-t border-white/10 space-y-3">
+               <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-widest text-center">Global Environmental Input</h3>
+               <div className="flex flex-col gap-2">
                  <input 
                    type="text" value={parentInput} onChange={(e) => setParentInput(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && (triggerGlobalEvent(parentInput), setParentInput(''))}
-                   placeholder="Alter the environment..."
-                   className="w-full bg-black border-2 border-white/10 p-4 text-[11px] rounded-xl focus:border-yellow-500/50 transition-all outline-none font-bold text-yellow-500 shadow-lg"
+                   placeholder="Affect the whole town..."
+                   className="w-full bg-black border-2 border-white/10 p-4 text-[12px] rounded-xl focus:border-yellow-500/60 transition-all outline-none font-bold text-yellow-500 text-center shadow-lg"
                  />
-                 <p className="text-[7px] text-gray-700 mt-3 text-center uppercase font-black">Reality warping protocols standing by</p>
-              </div>
-           </div>
-         )}
+                 <button onClick={() => {triggerGlobalEvent(parentInput); setParentInput('');}} className="w-full bg-yellow-600 hover:bg-yellow-500 text-black p-3 rounded-xl text-[10px] font-black uppercase shadow-lg active:scale-95">Broadcast Event</button>
+               </div>
+            </div>
+         </div>
       </div>
     </div>
   );
